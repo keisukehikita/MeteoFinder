@@ -27,15 +27,26 @@ cp config.example.py config.py
 ## Usage
 
 ```bash
-# Basic usage
+# Basic usage (uses API if configured, otherwise local-only)
 python main.py /path/to/your/photos
 
 # Adjust pre-filter sensitivity (1-5, default: 3)
 python main.py /path/to/photos --sensitivity 4
 
-# Pre-filter only (no API calls, for testing)
+# Force local-only mode (no API calls, faster but less accurate)
+python main.py /path/to/photos --local
+
+# Pre-filter only (list candidates without copying)
 python main.py /path/to/photos --prefilter-only
 ```
+
+## Modes
+
+| Mode | Description | Accuracy |
+|------|-------------|----------|
+| Hybrid (default with API key) | OpenCV pre-filter + Claude API verification | Highest |
+| Local-only (no API key or --local) | OpenCV detection only | Good, may have false positives |
+| Pre-filter only | List candidates without copying | For testing |
 
 ### Sensitivity Levels
 

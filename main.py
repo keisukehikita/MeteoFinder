@@ -9,6 +9,7 @@ Examples:
     python main.py C:\\Photos\\NightSky
     python main.py ./images --sensitivity 4
     python main.py ./images -s 2
+    python main.py ./images --local  # Force local-only mode
 """
 
 import argparse
@@ -25,7 +26,13 @@ except ImportError:
 
 from config import SUPPORTED_EXTENSIONS, DEFAULT_SENSITIVITY, OUTPUT_FOLDER, ANTHROPIC_API_KEY
 from detector.prefilter import detect_streak, get_sensitivity_description
-from detector.claude_vision import verify_meteor
+
+
+def has_valid_api_key() -> bool:
+    """Check if a valid API key is configured."""
+    return (ANTHROPIC_API_KEY
+            and ANTHROPIC_API_KEY != "your-api-key-here"
+            and len(ANTHROPIC_API_KEY) > 10)
 
 
 def find_images(folder: Path) -> List[Path]:
@@ -70,7 +77,12 @@ Sensitivity levels (1-5):
     parser.add_argument(
         "--prefilter-only",
         action="store_true",
-        help="Only run pre-filter (skip Claude API verification)"
+        help="Only run pre-filter, list candidates without copying"
+    )
+    parser.add_argument(
+        "--local",
+        action="store_true",
+        help="Force local-only mode (no API calls, uses OpenCV only)"
     )
 
     args = parser.parse_args()
@@ -84,10 +96,12 @@ Sensitivity levels (1-5):
         print(f"Error: Not a directory: {folder}")
         sys.exit(1)
 
-    # Check API key
-    if not args.prefilter_only and ANTHROPIC_API_KEY == "your-api-key-here":
-        print("Error: Please set your ANTHROPIC_API_KEY in config.py")
-        sys.exit(1)
+    # Determine mode: local-only or hybrid (with API)
+    use_api = has_valid_api_key() and not args.local
+
+    if not use_api and not args.local and not args.prefilter_only:
+        print("Note: No API key found. Running in local-only mode (OpenCV detection).")
+        print("      For better accuracy, add your API key to config.py\n")
 
     # Find images
     images = find_images(folder)
@@ -96,11 +110,20 @@ Sensitivity levels (1-5):
         print(f"Supported formats: {', '.join(SUPPORTED_EXTENSIONS)}")
         sys.exit(1)
 
+    # Determine mode string for display
+    if args.prefilter_only:
+        mode_str = "Pre-filter only (listing candidates)"
+    elif use_api:
+        mode_str = "Hybrid (OpenCV + Claude API)"
+    else:
+        mode_str = "Local only (OpenCV)"
+
     print(f"\nMeteoFinder")
     print(f"{'=' * 50}")
     print(f"Folder: {folder}")
     print(f"Images found: {len(images)}")
     print(f"Sensitivity: {args.sensitivity} - {get_sensitivity_description(args.sensitivity)}")
+    print(f"Mode: {mode_str}")
     print(f"{'=' * 50}\n")
 
     # Create output folder
@@ -128,7 +151,31 @@ Sensitivity levels (1-5):
             print(f"  - {c.name}")
         return
 
-    # Phase 2: Verify with Claude API
+    # Local-only mode: copy all candidates directly
+    if not use_api:
+        print(f"\nLocal mode: Copying {len(candidates)} candidates to Found folder...")
+        for img_path in candidates:
+            dest = output_folder / img_path.name
+            if not dest.exists():
+                shutil.copy2(img_path, dest)
+
+        # Summary for local mode
+        print(f"\n{'=' * 50}")
+        print("RESULTS (Local Mode)")
+        print(f"{'=' * 50}")
+        print(f"Total images scanned: {len(images)}")
+        print(f"Potential meteors found: {len(candidates)}")
+        print(f"\nImages copied to: {output_folder}")
+        print("\nDetected candidates:")
+        for img_path in candidates:
+            print(f"  - {img_path.name}")
+        print("\nNote: Local mode may include false positives (planes, satellites).")
+        print("      For better accuracy, add your API key to config.py")
+        return
+
+    # Phase 2: Verify with Claude API (hybrid mode)
+    from detector.claude_vision import verify_meteor
+
     print(f"\nPhase 2: Verifying {len(candidates)} candidates with Claude Vision API...")
     confirmed_meteors = []
 
@@ -150,7 +197,7 @@ Sensitivity levels (1-5):
             status = "METEOR" if result["is_meteor"] else "no meteor"
             print(f"  {img_path.name}: {status}")
 
-    # Summary
+    # Summary for hybrid mode
     print(f"\n{'=' * 50}")
     print("RESULTS")
     print(f"{'=' * 50}")
