@@ -1,5 +1,7 @@
 # MeteoFinder
 
+[日本語版 README](README_ja.md)
+
 A hybrid meteor detection tool that uses OpenCV pre-filtering and Claude Vision API to find meteors in night sky photographs.
 
 ## How It Works
