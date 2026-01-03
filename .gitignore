@@ -1,0 +1,30 @@
+# Claude Code
+.claude/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Project specific
+Found/
+config.py
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test images
+Meteor/
+NotMeteor/
