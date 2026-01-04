@@ -12,11 +12,11 @@ from typing import Optional, Tuple, List
 # Sensitivity parameters mapping (1-5 scale)
 # Each tuple: (canny_low, canny_high, min_line_length, max_line_gap, min_brightness)
 SENSITIVITY_PARAMS = {
-    1: (100, 200, 100, 5, 180),   # Very strict
-    2: (80, 160, 80, 8, 150),     # Strict
-    3: (50, 150, 50, 10, 120),    # Balanced
-    4: (30, 100, 30, 15, 100),    # Sensitive
-    5: (20, 80, 20, 20, 80),      # Very sensitive
+    1: (100, 200, 100, 5, 120),   # Very strict (adjusted to catch fainter meteors)
+    2: (80, 160, 80, 8, 110),     # Strict
+    3: (50, 150, 50, 10, 100),    # Balanced
+    4: (30, 100, 30, 15, 85),     # Sensitive (catches very faint meteors)
+    5: (20, 80, 20, 20, 75),      # Very sensitive (maximum detection)
 }
 
 
