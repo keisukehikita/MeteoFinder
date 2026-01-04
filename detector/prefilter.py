@@ -344,6 +344,11 @@ def detect_streak(image_path: str, sensitivity: int = 3) -> bool:
         if not (5 < angle < 175 and angle != 90):
             continue
 
+        # NEW: Check for dotted/dashed line pattern (airplane with blinking lights)
+        if _is_dotted_line(gray, x1, y1, x2, y2, min_brightness):
+            # Dotted pattern detected - likely an airplane
+            continue
+
         # NEW: Check for red lights along the streak (airplane navigation lights)
         # Scale coordinates back to original image if needed
         if scale_factor != 1.0:
@@ -361,6 +366,13 @@ def detect_streak(image_path: str, sensitivity: int = 3) -> bool:
         current_streaks.append(streak_pos)
 
     if not current_streaks:
+        return False
+
+    # NEW: Check for parallel lines (airplane with dual/triple wing lights)
+    # Count how many lines are mutually parallel
+    parallel_count = _count_parallel_lines(current_streaks)
+    if parallel_count >= 2:
+        # 2 or more parallel lines detected - likely airplane
         return False
 
     # NEW: Filter out clouds - clouds create many random lines
@@ -393,6 +405,125 @@ def detect_streak(image_path: str, sensitivity: int = 3) -> bool:
     _previous_streak_cache = [(image_path, pos) for pos in current_streaks] + _previous_streak_cache[:6]
 
     return has_meteor_candidate
+
+
+def _lines_are_parallel(pos1: Tuple[float, float, float],
+                         pos2: Tuple[float, float, float],
+                         distance_threshold: float = 0.1,
+                         angle_threshold: float = 15) -> bool:
+    """
+    Check if two lines are parallel (indicating airplane with dual wing lights).
+
+    Args:
+        pos1, pos2: Line positions (center_x, center_y, angle)
+        distance_threshold: Maximum perpendicular distance (0-1 scale)
+        angle_threshold: Maximum angle difference in degrees
+
+    Returns:
+        True if lines are parallel (likely airplane)
+    """
+    x1, y1, a1 = pos1
+    x2, y2, a2 = pos2
+
+    # Check angle similarity
+    angle_diff = abs(a1 - a2)
+    if angle_diff > 180:
+        angle_diff = 360 - angle_diff
+
+    if angle_diff > angle_threshold:
+        return False
+
+    # Calculate perpendicular distance between lines
+    # Convert angle to radians for calculation
+    angle_rad = np.radians(a1)
+
+    # Vector from line1 center to line2 center
+    dx = x2 - x1
+    dy = y2 - y1
+
+    # Perpendicular distance = |dx * sin(angle) - dy * cos(angle)|
+    perp_distance = abs(dx * np.sin(angle_rad) - dy * np.cos(angle_rad))
+
+    # Parallel if angles similar and lines are close but not the same
+    return perp_distance < distance_threshold and perp_distance > 0.01
+
+
+def _count_parallel_lines(streaks: List[Tuple[float, float, float]],
+                          distance_threshold: float = 0.1,
+                          angle_threshold: float = 15) -> int:
+    """
+    Count the maximum number of mutually parallel lines in a group.
+
+    Args:
+        streaks: List of line positions (center_x, center_y, angle)
+        distance_threshold: Maximum perpendicular distance (0-1 scale)
+        angle_threshold: Maximum angle difference in degrees
+
+    Returns:
+        Maximum count of mutually parallel lines found
+    """
+    if len(streaks) < 2:
+        return 0
+
+    max_parallel_count = 0
+
+    # For each line, count how many other lines are parallel to it
+    for i in range(len(streaks)):
+        parallel_group = [i]  # Start with the current line
+
+        for j in range(len(streaks)):
+            if i == j:
+                continue
+
+            # Check if line j is parallel to line i
+            if _lines_are_parallel(streaks[i], streaks[j], distance_threshold, angle_threshold):
+                parallel_group.append(j)
+
+        # Update max count if this group is larger
+        if len(parallel_group) > max_parallel_count:
+            max_parallel_count = len(parallel_group)
+
+    return max_parallel_count
+
+
+def _is_dotted_line(img: np.ndarray, x1: int, y1: int, x2: int, y2: int,
+                    min_brightness: int = 100) -> bool:
+    """
+    Check if a line is dotted/dashed (airplane with blinking lights).
+
+    Args:
+        img: Grayscale image
+        x1, y1, x2, y2: Line coordinates
+        min_brightness: Threshold for bright pixels
+
+    Returns:
+        True if line appears dotted (likely airplane)
+    """
+    # Sample many points along the line
+    line_length = int(np.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2))
+    num_samples = max(30, line_length // 3)
+
+    x_points = np.linspace(x1, x2, num_samples).astype(int)
+    y_points = np.linspace(y1, y2, num_samples).astype(int)
+
+    # Ensure points are within image bounds
+    height, width = img.shape[:2]
+    x_points = np.clip(x_points, 0, width - 1)
+    y_points = np.clip(y_points, 0, height - 1)
+
+    # Get brightness values along the line
+    brightness_values = img[y_points, x_points]
+
+    # Detect bright and dark segments
+    is_bright = brightness_values > min_brightness
+
+    # Count transitions from bright to dark (or vice versa)
+    transitions = np.sum(np.abs(np.diff(is_bright.astype(int))))
+
+    # If there are multiple transitions (gaps in brightness), it's dotted
+    # Meteors have continuous brightness, airplanes blink
+    # More than 3 transitions suggests a dotted pattern
+    return transitions > 3
 
 
 def _are_images_adjacent(name1: str, name2: str) -> bool:

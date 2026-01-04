@@ -134,8 +134,8 @@ Make sure you have run phase1_detect.py first and reviewed the candidates.
         return
 
     # Confirm before proceeding
-    print(f"⚠️  WARNING: This will make {len(candidates)} API calls")
-    print(f"⚠️  Estimated cost: ~${estimated_cost:.2f}")
+    print(f"WARNING: This will make {len(candidates)} API calls")
+    print(f"Estimated cost: ~${estimated_cost:.2f}")
     print()
     response = input("Do you want to proceed? (yes/no): ").strip().lower()
 

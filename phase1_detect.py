@@ -124,10 +124,12 @@ Run phase2_verify.py separately to verify candidates with Claude Vision API.
     # Phase 1: Pre-filter with OpenCV
     print("Phase 1: Pre-filtering with OpenCV...")
     print("Filters applied:")
-    print("  ✓ Brightness check (filters dark wires)")
-    print("  ✓ Red light detection (filters airplanes)")
-    print("  ✓ Temporal continuity (filters satellites)")
-    print("  ✓ Cloud detection (filters multi-line images)")
+    print("  - Brightness check (filters dark wires)")
+    print("  - Dotted line detection (filters blinking airplane lights)")
+    print("  - Red light detection (filters airplane navigation lights)")
+    print("  - Parallel line detection (filters multi-wing airplane lights)")
+    print("  - Temporal continuity (filters satellites)")
+    print("  - Cloud detection (filters multi-line images)")
     print()
 
     candidates = []
